@@ -7,6 +7,7 @@ from src.middlewares.profile import profiler_manager, profile
 from src.funcs.format import fmt_biparte_q
 from src.controllers.manager import Manager
 from src.models.base.sia import SIA
+import math
 
 from src.models.core.solution import Solution
 from src.constants.models import (
@@ -160,17 +161,30 @@ class QNodes(SIA):
 
     def algorithm(self, vertices: list[tuple[int, int]]):
         """
-        Implementa el algoritmo Q para encontrar la partición óptima de un sistema que minimiza la pérdida de información, basándose en principios de submodularidad dentro de la teoría de lainformación.
+        Implementa el algoritmo Q para encontrar la partición óptima de un sistema que 
+        minimiza la pérdida de información, basándose en principios de submodularidad 
+        dentro de la teoría de lainformación.
 
-        El algoritmo opera sobre un conjunto de vértices que representan nodos en diferentes tiempos del sistema (presente y futuro). La idea fundamental es construir incrementalmente grupos de nodos que, cuando se particionan, producen la menor pérdida posible de información en el sistema.
+        El algoritmo opera sobre un conjunto de vértices que representan nodos en 
+        diferentes tiempos del sistema (presente y futuro). La idea fundamental es 
+        construir incrementalmente grupos de nodos que, cuando se particionan, 
+        producen la menor pérdida posible de información en el sistema.
 
         Proceso Principal:
         -----------------
-        El algoritmo comienza estableciendo dos conjuntos fundamentales: omega (W) y delta.
-        Omega siempre inicia con el primer vértice del sistema, mientras que delta contiene todos los vértices restantes. Esta decisión no es arbitraria - al comenzar con un
-        solo elemento en omega, podemos construir grupos de manera incremental evaluando cómo cada adición afecta la pérdida de información.
+        El algoritmo comienza estableciendo dos conjuntos fundamentales: omega (W) y 
+        delta.
+        Omega siempre inicia con el primer vértice del sistema, mientras que delta 
+        contiene todos los vértices restantes. Esta decisión no es arbitraria - al 
+        comenzar con un
+        solo elemento en omega, podemos construir grupos de manera incremental evaluando 
+        cómo cada adición afecta la pérdida de información.
 
-        La ejecución se desarrolla en fases, ciclos e iteraciones, donde cada fase representa un nivel diferente y conlleva a la formación de una partición candidata, cada ciclo representa un incremento de elementos al conjunto W y cada iteración determina al final cuál es el mejor elemento/cambio/delta para añadir en W.
+        La ejecución se desarrolla en fases, ciclos e iteraciones, donde cada fase 
+        representa un nivel diferente y conlleva a la formación de una partición 
+        candidata, cada ciclo representa un incremento de elementos al conjunto W y 
+        cada iteración determina al final cuál es el mejor elemento/cambio/delta para 
+        añadir en W.
         Fase >> Ciclo >> Iteración.
 
         1. Formación Incremental de Grupos:
@@ -235,6 +249,9 @@ class QNodes(SIA):
                     emd_union, emd_delta, dist_marginal_delta = self.funcion_submodular(
                         deltas_ciclo[k], omegas_ciclo
                     )
+                    
+                    
+                    
                     emd_iteracion = emd_union - emd_delta
 
                     if emd_iteracion < emd_local:
@@ -250,14 +267,22 @@ class QNodes(SIA):
                 deltas_ciclo.pop(indice_mip)
                 ...
 
-            self.memoria_particiones[
-                tuple(
-                    deltas_ciclo[LAST_IDX]
-                    if isinstance(deltas_ciclo[LAST_IDX], list)
-                    else deltas_ciclo
-                )
-            ] = emd_particion_candidata, dist_particion_candidata
+            # Definir clave de la partición candidata
+            clave_particion = tuple(
+                deltas_ciclo[LAST_IDX]
+                if isinstance(deltas_ciclo[LAST_IDX], list)
+                else deltas_ciclo
+            )
 
+            # Guardar partición candidata en memoria
+            self.memoria_particiones[clave_particion] = emd_particion_candidata, dist_particion_candidata
+
+            # ✅ Nuevo bloque: Salida anticipada si la pérdida es 0
+            if emd_particion_candidata == 0.0:
+                self.logger.critic(f"Partición perfecta encontrada con pérdida cero: {clave_particion}")
+                return clave_particion  # <- Se detiene el algoritmo aquí mismo y retorna esta partición
+            
+            
             par_candidato = (
                 [omegas_ciclo[LAST_IDX]]
                 if isinstance(omegas_ciclo[LAST_IDX], tuple)
@@ -273,6 +298,7 @@ class QNodes(SIA):
 
             vertices_fase = omegas_ciclo
             ...
+
 
         return min(
             self.memoria_particiones, key=lambda k: self.memoria_particiones[k][0]
@@ -316,54 +342,40 @@ class QNodes(SIA):
             )
             Esto lo hice así para hacer almacenamiento externo de la emd individual y su distribución marginal en las particiones candidatas.
         """
-        emd_delta = INFTY_NEG
-        temporal = [[], []]
+        # Normalizar entradas a conjuntos
+        deltas_set = frozenset([deltas] if isinstance(deltas, tuple) else deltas)
+        omegas_flat = [item for sublist in omegas for item in (sublist if isinstance(sublist, list) else [sublist])]
+        union_set = deltas_set.union(frozenset(omegas_flat))
 
-        if isinstance(deltas, tuple):
-            d_tiempo, d_indice = deltas
-            temporal[d_tiempo].append(d_indice)
+        # Obtener EMD y distribución para delta (usar memoria si existe)
+        emd_delta, dist_delta = self._calcular_emd_particion(deltas_set)
 
-        else:
-            for delta in deltas:
-                d_tiempo, d_indice = delta
-                temporal[d_tiempo].append(d_indice)
+        # Obtener EMD para la unión (no necesitamos su distribución)
+        emd_union, _ = self._calcular_emd_particion(union_set)
 
-        copia_delta = self.sia_subsistema
+        return emd_union, emd_delta, dist_delta
 
-        dims_alcance_delta = temporal[EFECTO]
-        dims_mecanismo_delta = temporal[ACTUAL]
+    def _calcular_emd_particion(self, nodos_set: frozenset[tuple[int, int]]):
+        """Calcula (y guarda en memoria) la EMD y distribución para un conjunto de nodos."""
+        if nodos_set in self.memoria_omega:
+            return self.memoria_omega[nodos_set]
 
-        particion_delta = copia_delta.bipartir(
-            np.array(dims_alcance_delta, dtype=np.int8),
-            np.array(dims_mecanismo_delta, dtype=np.int8),
+        # Separar nodos por tiempo (presente/futuro)
+        tiempos = [[], []]
+        for t, idx in nodos_set:
+            tiempos[t].append(idx)
+
+        # Calcular bipartición y distribución
+        particion = self.sia_subsistema.bipartir(
+            np.array(tiempos[EFECTO], dtype=np.int8),
+            np.array(tiempos[ACTUAL], dtype=np.int8)
         )
-        vector_delta_marginal = particion_delta.distribucion_marginal()
-        emd_delta = emd_efecto(vector_delta_marginal, self.sia_dists_marginales)
+        dist_marginal = particion.distribucion_marginal()
+        emd = emd_efecto(dist_marginal, self.sia_dists_marginales)
 
-        # Unión #
-
-        for omega in omegas:
-            if isinstance(omega, list):
-                for omg in omega:
-                    o_tiempo, o_indice = omg
-                    temporal[o_tiempo].append(o_indice)
-            else:
-                o_tiempo, o_indice = omega
-                temporal[o_tiempo].append(o_indice)
-
-        copia_union = self.sia_subsistema
-
-        dims_alcance_union = temporal[EFECTO]
-        dims_mecanismo_union = temporal[ACTUAL]
-
-        particion_union = copia_union.bipartir(
-            np.array(dims_alcance_union, dtype=np.int8),
-            np.array(dims_mecanismo_union, dtype=np.int8),
-        )
-        vector_union_marginal = particion_union.distribucion_marginal()
-        emd_union = emd_efecto(vector_union_marginal, self.sia_dists_marginales)
-
-        return emd_union, emd_delta, vector_delta_marginal
+        # Guardar en memoria
+        self.memoria_omega[nodos_set] = (emd, dist_marginal)
+        return emd, dist_marginal
 
     def nodes_complement(self, nodes: list[tuple[int, int]]):
         return list(set(self.vertices) - set(nodes))

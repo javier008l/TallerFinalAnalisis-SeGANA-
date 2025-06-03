@@ -179,7 +179,7 @@ cython_debug/
 .archive/**
 **/.archive
 results
-
+.xlsx
 # Profiling
 review
 review/*

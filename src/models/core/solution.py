@@ -117,89 +117,89 @@ class Solution:
         self.id_voz = voz
         self.hablar = hablar
 
-    def __obtener_voz_espanol(self, motor: Engine) -> Optional[str]:
-        """
-        Busca y obtiene un identificador de voz en español del sistema.
+    # def __obtener_voz_espanol(self, motor: Engine) -> Optional[str]:
+    #     """
+    #     Busca y obtiene un identificador de voz en español del sistema.
 
-        Esta función implementa un sistema de prioridades para seleccionar
-        la mejor voz disponible en español, priorizando voces específicas
-        de diferentes regiones hispanohablantes.
+    #     Esta función implementa un sistema de prioridades para seleccionar
+    #     la mejor voz disponible en español, priorizando voces específicas
+    #     de diferentes regiones hispanohablantes.
 
-        Args:
-        ----
-            motor:
-                Instancia del motor de síntesis de voz pyttsx3.Engine.
+    #     Args:
+    #     ----
+    #         motor:
+    #             Instancia del motor de síntesis de voz pyttsx3.Engine.
 
-        Returns:
-        -------
-            Optional[str]:
-                El identificador de la voz seleccionada, o None si no se
-                encuentra ninguna voz.
+    #     Returns:
+    #     -------
+    #         Optional[str]:
+    #             El identificador de la voz seleccionada, o None si no se
+    #             encuentra ninguna voz.
 
-        Notes:
-        -----
-            El orden de prioridad es:
-            1. Sabina (México)
-            2. Helena (España)
-            3. Cualquier voz con "spanish" en el nombre
-            4. Cualquier voz con "español" en el nombre
-            5. Cualquier voz con "es-" en el identificador
-            6. Primera voz disponible si no se encuentra ninguna en español
-        """
-        voces: list[Voice] = motor.getProperty("voices")
+    #     Notes:
+    #     -----
+    #         El orden de prioridad es:
+    #         1. Sabina (México)
+    #         2. Helena (España)
+    #         3. Cualquier voz con "spanish" en el nombre
+    #         4. Cualquier voz con "español" en el nombre
+    #         5. Cualquier voz con "es-" en el identificador
+    #         6. Primera voz disponible si no se encuentra ninguna en español
+    #     """
+    #     voces: list[Voice] = motor.getProperty("voices")
 
-        prioridades = [
-            ("sabina", "méxico"),
-            ("helena", "españa"),
-            ("spanish", None),
-            ("español", None),
-            ("es-", None),
-        ]
+    #     prioridades = [
+    #         ("sabina", "méxico"),
+    #         ("helena", "españa"),
+    #         ("spanish", None),
+    #         ("español", None),
+    #         ("es-", None),
+    #     ]
 
-        for nombre_buscado, region in prioridades:
-            for voz in voces:
-                nombre_voz = voz.name.lower()
-                id_voz = voz.id.lower()
+    #     for nombre_buscado, region in prioridades:
+    #         for voz in voces:
+    #             nombre_voz = voz.name.lower()
+    #             id_voz = voz.id.lower()
 
-                if nombre_buscado in nombre_voz or nombre_buscado in id_voz:
-                    if region is None or region in nombre_voz:
-                        return voz.id
+    #             if nombre_buscado in nombre_voz or nombre_buscado in id_voz:
+    #                 if region is None or region in nombre_voz:
+    #                     return voz.id
 
-        return voces[0].id if voces else None
+    #     return voces[0].id if voces else None
 
-    def __anunciar_solucion(self) -> None:
-        """
-        Anuncia la solución encontrada usando síntesis de voz en español.
+    # def __anunciar_solucion(self) -> None:
+    #     """
+    #     Anuncia la solución encontrada usando síntesis de voz en español.
 
-        Esta función configura y utiliza el motor de síntesis de voz para anunciar de forma audible que se ha encontrado una solución, incluyendo el valor φ calculado.
+    #     Esta función configura y utiliza el motor de síntesis de voz para anunciar de forma audible que se ha encontrado una solución, incluyendo el valor φ calculado.
 
-        La función se ejecuta en un hilo separado para no bloquear la ejecución principal del programa mientras se realiza la síntesis de voz.
+    #     La función se ejecuta en un hilo separado para no bloquear la ejecución principal del programa mientras se realiza la síntesis de voz.
 
-        Notes:
-        -----
-            - Utilizar una velocidad de habla más lenta (150) para mejor comprensión
-            - Se establece el volumen al 90% por defecto
-            - Maneja excepciones de forma silenciosa para no interrumpir la ejecución
-        """
-        try:
-            motor = pyttsx3.init()
+    #     Notes:
+    #     -----
+    #         - Utilizar una velocidad de habla más lenta (150) para mejor comprensión
+    #         - Se establece el volumen al 90% por defecto
+    #         - Maneja excepciones de forma silenciosa para no interrumpir la ejecución
+    #     """
+    #     try:
+    #         motor = pyttsx3.init()
 
-            id_voz = self.id_voz or self.__obtener_voz_espanol(motor)
-            if id_voz:
-                motor.setProperty("voice", id_voz)
+    #         id_voz = self.id_voz or self.__obtener_voz_espanol(motor)
+    #         if id_voz:
+    #             motor.setProperty("voice", id_voz)
 
-            motor.setProperty("rate", 150)
-            motor.setProperty("volume", 0.9)
+    #         motor.setProperty("rate", 150)
+    #         motor.setProperty("volume", 0.9)
 
-            mensaje = f"Solución encontrada con {self.estrategia}." + (
-                f"El valor de fi es de {self.perdida:.2f}"
-                if self.perdida > FLOAT_ZERO
-                else "No hubo pérdida."
-            )
-            motor.say(mensaje)
-            motor.runAndWait()
-        except Exception as e:
-            print(f"Error al inicializar el motor de voz: {e}")
+    #         mensaje = f"Solución encontrada con {self.estrategia}." + (
+    #             f"El valor de fi es de {self.perdida:.2f}"
+    #             if self.perdida > FLOAT_ZERO
+    #             else "No hubo pérdida."
+    #         )
+    #         motor.say(mensaje)
+    #         motor.runAndWait()
+    #     except Exception as e:
+    #         print(f"Error al inicializar el motor de voz: {e}")
 
     def __str__(self) -> str:
         """
@@ -242,9 +242,6 @@ class Solution:
             )
             return f"[ {datos}{mensaje_desborde} {Fore.WHITE}]"
 
-        if self.hablar:
-            voz = Thread(target=self.__anunciar_solucion)
-            voz.start()
 
         es_pyphi = self.estrategia == "Pyphi"
         tipo_distribucion = "" if es_pyphi else "marginal"
