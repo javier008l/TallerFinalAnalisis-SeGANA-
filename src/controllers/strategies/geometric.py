@@ -5,6 +5,8 @@ import numpy as np
 import time
 from src.funcs.base import ABECEDARY
 from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing as mp
 
 class Geometric(SIA):
     def __init__(self, gestor):
@@ -32,15 +34,45 @@ class Geometric(SIA):
         )
 
     def _calcular_tabla_costos(self):
-        n = len(next(iter(self.tensores.values())))  # Número de estados: 2^n
-        estados = list(range(n))  # Los estados van de 0 a 2^n - 1
+        """Calcula la tabla de costos usando los tensores existentes"""
+        n = len(self.sia_subsistema.dims_ncubos)
+        n_estados = 2 ** n
+        estados = list(range(n_estados))
 
+        # Usar float16 para reducir memoria
         for var, tensor in self.tensores.items():
-            self.tabla_costos[var] = np.zeros((n, n), dtype=np.float32)
+            self.tabla_costos[var] = np.zeros((n_estados, n_estados), dtype=np.float16)
+            
+            # Paralelizar por niveles de distancia Hamming
+            with ThreadPoolExecutor(max_workers=mp.cpu_count()) as executor:
+                for d in range(1, n + 1):
+                    futures = []
+                    for i in estados:
+                        for j in estados:
+                            if self._distancia_hamming(i, j) == d:
+                                # Enviar cálculo a un thread
+                                future = executor.submit(
+                                    self._calcular_costo_paralelo,
+                                    i, j, tensor, d, var
+                                )
+                                futures.append((i, j, future))
+                    
+                    # Recolectar resultados
+                    for i, j, future in futures:
+                        self.tabla_costos[var][i][j] = future.result()
 
-            for i in estados:
-                for j in estados:
-                    self.tabla_costos[var][i][j] = self._calcular_transicion_costo(i, j, tensor)
+    def _calcular_costo_paralelo(self, i, j, X, d, var):
+        """Versión paralelizada del cálculo de costo"""
+        gamma = 2 ** (-d)
+        costo_base = abs(X[i] - X[j])
+        
+        if d == 1:
+            return gamma * costo_base
+        else:
+            vecinos = self._vecinos_hamming(i, j)
+            costo_acumulado = sum(self.tabla_costos[var][v][j] for v in vecinos)
+            return gamma * (costo_base + costo_acumulado)
+
     def mostrar_tabla_costos(self):
         print("\n📊 TABLA DE COSTOS POR VARIABLE")
         for var, matriz in self.tabla_costos.items():
@@ -57,17 +89,15 @@ class Geometric(SIA):
     def _descomponer_en_tensores(self) -> dict[str, np.ndarray]:
         """
         Extrae una representación tipo-TPM desde los NCubes del subsistema.
-
-        Devuelve:
-            dict[str, np.ndarray]: Diccionario {nombre_variable: vector plano de 2^n valores}
+        Invierte el orden de las variables para seguir enfoque bottom-up.
         """
-        dims = self.sia_subsistema.dims_ncubos  # e.g., [0,1,2]
+        dims = self.sia_subsistema.dims_ncubos
         n = len(dims)
         longitud_esperada = 2 ** n
-
         tensores = {}
 
-        for cube in self.sia_subsistema.ncubos:
+        # Invertir el orden de los cubos
+        for cube in reversed(self.sia_subsistema.ncubos):
             var_name = ABECEDARY[cube.indice]
 
             if cube.dims.size != n:
@@ -178,3 +208,35 @@ class Geometric(SIA):
                 mejor_biparticion = (parte1, parte2)
 
         return mejor_biparticion, menor_costo
+
+    def _cambio_cruzado(self, i: int, j: int, parte1: set, parte2: set) -> bool:
+        """
+        Verifica si el cambio entre estados i y j involucra variables
+        que están en diferentes grupos de la partición.
+
+        Args:
+            i (int): Estado inicial
+            j (int): Estado final
+            parte1 (set): Primer grupo de la partición
+            parte2 (set): Segundo grupo de la partición
+
+        Returns:
+            bool: True si el cambio cruza entre grupos, False en caso contrario
+        """
+        # Obtener bits que cambian entre i y j usando XOR
+        bits_cambiados = i ^ j
+        n = len(self.sia_subsistema.dims_ncubos)
+        
+        # Verificar cada bit que cambió
+        for pos in range(n):
+            if bits_cambiados & (1 << pos):  # Si el bit en pos cambió
+                # Convertir posición a nombre de variable
+                var = ABECEDARY[pos]
+                
+                # Verificar si la variable está en diferentes grupos
+                if (var in parte1 and var in parte2) or \
+                   (var in parte1 and any(ABECEDARY[k] in parte2 for k in range(n))) or \
+                   (var in parte2 and any(ABECEDARY[k] in parte1 for k in range(n))):
+                    return True
+                    
+        return False
