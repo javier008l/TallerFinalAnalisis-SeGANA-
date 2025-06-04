@@ -19,7 +19,8 @@ class Geometric(SIA):
         self.tensores = self._descomponer_en_tensores()
         self._calcular_tabla_costos()
 
-        self.mostrar_tabla_costos()
+        # self.guardar_tablas_csv()
+        self.mostrar_tensores()
 
         candidatos = self._identificar_candidatos()
         (parte1, parte2), costo = self._evaluar_candidatos(candidatos)
@@ -73,31 +74,19 @@ class Geometric(SIA):
             costo_acumulado = sum(self.tabla_costos[var][v][j] for v in vecinos)
             return gamma * (costo_base + costo_acumulado)
 
-    def mostrar_tabla_costos(self):
-        print("\n📊 TABLA DE COSTOS POR VARIABLE")
-        for var, matriz in self.tabla_costos.items():
-            print(f"\n🔹 Variable: {var}")
-            filas = matriz.shape[0]
-            header = "     " + " ".join([f"{j:>6}" for j in range(filas)])
-            print(header)
-            for i in range(filas):
-                fila_str = " ".join([f"{matriz[i][j]:6.3f}" for j in range(filas)])
-                print(f"{i:>3}: {fila_str}")
-
-
 
     def _descomponer_en_tensores(self) -> dict[str, np.ndarray]:
         """
         Extrae una representación tipo-TPM desde los NCubes del subsistema.
-        Invierte el orden de las variables para seguir enfoque bottom-up.
+        Mantiene el orden ABC (no invertido) para seguir el formato del documento.
         """
         dims = self.sia_subsistema.dims_ncubos
         n = len(dims)
         longitud_esperada = 2 ** n
         tensores = {}
 
-        # Invertir el orden de los cubos
-        for cube in reversed(self.sia_subsistema.ncubos):
+        # Mantener orden original (A, B, C)
+        for cube in self.sia_subsistema.ncubos:
             var_name = ABECEDARY[cube.indice]
 
             if cube.dims.size != n:
@@ -240,3 +229,107 @@ class Geometric(SIA):
                     return True
                     
         return False
+
+    def mostrar_tensores(self):
+        """
+        Muestra los tensores de probabilidad para cada variable
+        en formato binario para mejor comprensión.
+        """
+        print("\n📊 TENSORES DE PROBABILIDAD")
+        n = len(self.sia_subsistema.dims_ncubos)
+        
+        # Crear cabecera con estados binarios
+        estados_bin = [format(i, f'0{n}b') for i in range(2**n)]
+        
+        print("\nEstados →", end="")
+        for estado in estados_bin:
+            print(f" {estado:>5}", end="")
+        print()  # Nueva línea
+        
+        print("=" * (8 + 6 * len(estados_bin)))  # Línea separadora
+        
+        # Mostrar tensor para cada variable
+        for var, tensor in self.tensores.items():
+            print(f"P({var}=0|s)", end="")
+            for i, prob in enumerate(tensor):
+                print(f" {prob:5.2f}", end="")
+            print()  # Nueva línea
+    
+    def guardar_tablas_csv(self):
+        """
+        Guarda las tablas de costos en CSV diferenciando variables en t y t+1
+        """
+        import csv
+        import os
+        from datetime import datetime
+        import numpy as np
+
+        directorio = os.path.join(os.path.dirname(__file__), '..', '..', 'results', 'tablas_costos')
+        if not os.path.exists(directorio):
+            os.makedirs(directorio)
+
+        archivo = os.path.join(directorio, 'tablas_costos.csv')
+        modo = 'a' if os.path.exists(archivo) else 'w'
+
+        # Modificar la lógica para interpretar variables
+        variables = list(self.tabla_costos.keys())
+        var_map = {v: variables[-(i+1)] for i, v in enumerate(variables)}
+
+        # Interpretar variables según el formato del caso
+        variables_t1 = []  # Variables en t+1
+        variables_t = []   # Variables en t
+
+        # Primero identificar variables activas
+        for var in variables:
+            matriz = self.tabla_costos[var_map[var]]
+            if not np.allclose(matriz, 0):
+                if var.isupper():
+                    variables_t1.append(var)
+                    variables_t.append(var.lower())
+
+        with open(archivo, modo, newline='') as f:
+            writer = csv.writer(f)
+            n_estados = self.tabla_costos[variables[0]].shape[0]
+            
+            if modo == 'a':
+                writer.writerow(['#' * 80])
+                writer.writerow([])
+            
+            writer.writerow(['Fecha y Hora:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+            writer.writerow(['Variables activas en t+1:', ', '.join(sorted(variables_t1))])
+            writer.writerow(['Variables activas en t:', ', '.join(sorted(variables_t))])
+            writer.writerow(['Numero de estados:', n_estados])
+            writer.writerow([])
+            
+            # Primero mostrar variables en t+1
+            for var in sorted(variables_t1):
+                writer.writerow([f"Tabla de costos para variable {var} (t+1)"])
+                header = [''] + [str(j) for j in range(n_estados)]
+                writer.writerow(header)
+                
+                matriz = self.tabla_costos[var]  # Usar directamente la variable en mayúscula
+                for i in range(n_estados):
+                    fila = [str(i)] + [f"{matriz[i][j]:.3f}" for j in range(n_estados)]
+                    writer.writerow(fila)
+                
+                writer.writerow([])
+                writer.writerow(['=' * (n_estados * 8)])
+                writer.writerow([])
+            
+            # Para variables en t, usar la misma matriz que su versión en mayúscula
+            for var in sorted(variables_t):
+                var_upper = var.upper()  # Obtener versión en mayúscula
+                writer.writerow([f"Tabla de costos para variable {var} (t)"])
+                header = [''] + [str(j) for j in range(n_estados)]
+                writer.writerow(header)
+                
+                matriz = self.tabla_costos[var_upper]  # Usar la matriz de la variable en mayúscula
+                for i in range(n_estados):
+                    fila = [str(i)] + [f"{matriz[i][j]:.3f}" for j in range(n_estados)]
+                    writer.writerow(fila)
+                
+                writer.writerow([])
+                writer.writerow(['=' * (n_estados * 8)])
+                writer.writerow([])
+
+        print(f"\n💾 Tablas guardadas en: {archivo}")
