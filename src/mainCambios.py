@@ -4,19 +4,21 @@ import os
 from src.controllers.manager import Manager
 from src.controllers.strategies.q_nodes import QNodes
 from src.controllers.strategies.phi import Phi
-from src.controllers.strategies.geometric import Geometric
+from src.controllers.strategies.geometric2 import GeometricSIA
+from src.controllers.strategies.fastsplit import FastSplit
 
 def iniciar():
     """Punto de entrada principal"""
     estado_inicio = "100"
     condiciones = "111"
     casos = [
-        ('111', '111'),  # ABCt+1 | ABCt
-        ('111', '110'),  # ABCt+1 | ABt
-        ('111', '101'),  # ABCt+1 | ACt
-        ('111', '011'),  # ABCt+1 | BCt
-        ('110', '111'),  # ABt+1 | ABCt
-        ('110', '110'),  # ABt+1 | ABt
+        ('111', '100'),  # ABCt+1 | ABCt
+        # ('111', '111'),  # ABCt+1 | ABCt
+        # ('111', '110'),  # ABCt+1 | ABt
+        # ('111', '101'),  # ABCt+1 | ACt
+        # ('111', '011'),  # ABCt+1 | BCt
+        # ('110', '111'),  # ABt+1 | ABCt
+        # ('110', '110'),  # ABt+1 | ABt
         # ('110', '101'),  # ABt+1 | ACt
         # ('110', '011'),  # ABt+1 | BCt
         # ('101', '111'),  # ACt+1 | ABCt
@@ -95,11 +97,12 @@ def iniciar():
     # condiciones = "1111111111"    # Nunca cambia
     
     # casos = [
-        # ("1111111111", "1111111111"),
-        # ("1111111111", "1111111110"),
-        # ("1111111111", "0111111111"),
-        # ("1111111111", "0111111110"),
-        # ("1111111111", "1010101010"),
+    #     ("1111111111", "1111111111"),
+    #     ("1111111111", "1111111110"),
+    #     ("1111111111", "0111111111"),
+    #     ("1111111111", "0111111110"),
+    #     ("1111111111", "1010101010"),
+    # ]
         # ("1111111111", "0101010101"),
         # ("1111111111", "1101101101"),
         # ("1111111110", "1111111111"),
@@ -157,14 +160,15 @@ def iniciar():
     # condiciones   = "111111111111111"    # Nunca cambia
     
     # casos = [
-        # ("111111111111111", "111111111111111"),
-        # ("111111111111111", "111111111111110"),
-        # ("111111111111111", "011111111111111"),
-        # ("111111111111111", "011111111111110"),
-        # ("111111111111111", "101010101010101"),
-        # ("111111111111111", "010101010101010"),
-        # ("111111111111111", "110110110110110"),
-        
+    #     # ("111111111111111", "111111111111111"),
+    #     # ("111111111111111", "111111111111110"),
+    #     # ("111111111111111", "011111111111111"),
+    
+    #     # ("111111111111111", "011111111111110"),
+    #     # ("111111111111111", "101010101010101"),
+    #     ("111111111111111", "010101010101010"),
+    #     ("111111111111111", "110110110110110"),
+    # ]
         # ("111111111111110", "111111111111111"),
         # ("111111111111110", "111111111111110"),
         # ("111111111111110", "011111111111111"),
@@ -288,7 +292,7 @@ def iniciar():
     #Manager.generar_red( self=Manager, dimensiones=3, datos_discretos=True)
     
     # Nombre del archivo de resultados
-    archivo_excel = "PruebasTallerFinal.xlsx"
+    archivo_excel = "PruebasTaller2.xlsx"
 
     # Si el archivo no existe, crearlo con las columnas
     if not os.path.exists(archivo_excel):
@@ -301,7 +305,7 @@ def iniciar():
         config_sistema = Manager(estado_inicial=estado_inicio)
         
         ## Ejemplo de solución mediante módulo de fuerza bruta (QNodes) ###
-        analizador_fb = Geometric(config_sistema)
+        analizador_fb = QNodes(config_sistema)
         resultado = analizador_fb.aplicar_estrategia(condiciones, alcance, mecanismo)
         
         # Extraer los datos de la solución
