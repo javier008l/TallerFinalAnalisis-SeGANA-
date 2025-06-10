@@ -305,7 +305,7 @@ def iniciar():
         config_sistema = Manager(estado_inicial=estado_inicio)
         
         ## Ejemplo de solución mediante módulo de fuerza bruta (QNodes) ###
-        analizador_fb = QNodes(config_sistema)
+        analizador_fb = GeometricSIA(config_sistema)
         resultado = analizador_fb.aplicar_estrategia(condiciones, alcance, mecanismo)
         
         # Extraer los datos de la solución

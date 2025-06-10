@@ -249,9 +249,6 @@ class QNodes(SIA):
                     emd_union, emd_delta, dist_marginal_delta = self.funcion_submodular(
                         deltas_ciclo[k], omegas_ciclo
                     )
-                    
-                    
-                    
                     emd_iteracion = emd_union - emd_delta
 
                     if emd_iteracion < emd_local:
