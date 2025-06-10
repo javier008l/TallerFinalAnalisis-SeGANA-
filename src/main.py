@@ -1,10 +1,11 @@
 from src.middlewares.slogger import SafeLogger
 from src.controllers.manager import Manager
-from src.controllers.strategies.q_nodes import QNodes
+from src.controllers.strategies.geometric import Geometric
 
 import time
 
 def iniciar():
+    
     start_time = time.time() 
     """Punto de entrada principal"""
     estado_inicial = "100000000000000"
