@@ -7,6 +7,8 @@ from src.funcs.format import fmt_biparte_q
 from src.constants.models import GEOMETRIC_LABEL
 from src.constants.base import ACTUAL, EFECTO
 import time
+from itertools import product
+from functools import lru_cache
 
 
 class GeometricSIA(SIA):
@@ -29,7 +31,16 @@ class GeometricSIA(SIA):
         candidatos = self.identificar_biparticiones_candidatas()
         print(f"Candidatos identificados: {candidatos}")
         alcance, mecanismo, mejor_phi, mejor_distribucion = self.evaluar_biparticiones(candidatos, subsistema)
-
+        
+        tpm = self.sia_cargar_tpm()
+        
+        origen =  mecanismo
+        destino = alcance
+        # Construir X_v desde la TPM
+        X_v = self.construir_X_v_desde_tpm(tpm)
+        print(f"X_v construido: {X_v}")
+        #costo_total = self.calcular_costo_simple(origen, destino, X_v)
+        
         # Formatear partición como en QNodes
         fmt_mip = fmt_biparte_q(
             list((EFECTO, i) for i in alcance),
@@ -45,6 +56,8 @@ class GeometricSIA(SIA):
             particion=fmt_mip
         )
 
+    
+    
     
     def descomponer_en_tensores(self, sistema: System):
         return {cube.indice: cube.data for cube in sistema.ncubos}
@@ -120,3 +133,65 @@ class GeometricSIA(SIA):
                 mejor_distribucion = distribucion
         alcance, mecanismo = mejor
         return alcance, mecanismo, mejor_phi, mejor_distribucion
+        
+    def construir_X_v_desde_tpm(self, tpm: np.ndarray) -> dict:
+        """
+        Construye un diccionario X_v donde la clave es el estado en binario (str)
+        y el valor es la probabilidad marginal de ese estado (suma sobre filas de la TPM).
+        """
+        n = int(np.log2(tpm.shape[0]))
+        X_v = {}
+        for j in range(tpm.shape[1]):
+            estado_bin = format(j, f'0{n}b')
+            # Suma de probabilidades de transición hacia el estado j
+            X_v[estado_bin] = tpm[, j]
+        return X_v
+
+
+    def hamming(self, a, b):
+        return sum(x != y for x, y in zip(a, b))
+
+    def vecinos_hamming_1(self, estado):
+        """Genera todos los vecinos a distancia Hamming 1"""
+        vecinos = []
+        for i in range(len(estado)):
+            nuevo = estado[:i] + ('0' if estado[i] == '1' else '1') + estado[i+1:]
+            vecinos.append(nuevo)
+        return vecinos
+
+    @lru_cache(maxsize=None)
+    def calcular_costo_ruta_especifica(self, origen, destino, X_v_tuple):
+        """
+        Calcula el costo de una ruta específica usando memoización.
+        X_v_tuple debe ser una tupla de (estado, valor) para permitir hashing.
+        """
+        # Convertir tupla de vuelta a diccionario para cálculos
+        X_v = dict(X_v_tuple)
+
+        d = self.hamming(origen, destino)
+
+        # Caso base
+        if d == 0:
+            return 0.0
+
+        # Cálculo del costo
+        gamma = 2 ** (-d)
+        costo_directo = abs(X_v[origen] - X_v[destino])
+
+        # Calcular acumulado de vecinos intermedios
+        acumulado = 0.0
+        for vecino in self.vecinos_hamming_1(origen):
+            if self.hamming(vecino, destino) < d:  # vecino está en camino óptimo
+                acumulado += self.calcular_costo_ruta_especifica(vecino, destino, X_v_tuple)
+
+        return gamma * (costo_directo + acumulado)
+
+
+    def calcular_costo_simple(self, origen, destino, X_v):
+        """
+        Interfaz simple para calcular el costo entre dos estados específicos
+        """
+        # Convertir X_v a tupla para permitir memoización
+        X_v_tuple = tuple(sorted(X_v.items()))
+
+        return self.calcular_costo_ruta_especifica(origen, destino, X_v_tuple)

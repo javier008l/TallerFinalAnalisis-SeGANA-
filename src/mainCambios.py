@@ -2,10 +2,12 @@ import pandas as pd
 from openpyxl import load_workbook
 import os
 from src.controllers.manager import Manager
-from src.controllers.strategies.q_nodes import QNodes
+from src.controllers.strategies.geometric2 import GeometricSIA
 from src.controllers.strategies.phi import Phi
 from src.controllers.strategies.geometric2 import GeometricSIA
 from src.controllers.strategies.fastsplit import FastSplit
+from collections.abc import Iterable
+
 
 def iniciar():
     """Punto de entrada principal"""
