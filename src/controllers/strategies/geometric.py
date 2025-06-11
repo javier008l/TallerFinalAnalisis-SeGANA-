@@ -1,85 +1,185 @@
+#from src.controllers.strategies.ScalableCostTable import example_large_system
 from src.models.base.sia import SIA
-from src.models.core.solution import Solution
-from src.constants.models import GEOMETRIC_LABEL
+from src.models.core.system import System
 import numpy as np
+from typing import Tuple
+from src.models.core.solution import Solution
+from src.funcs.format import fmt_biparte_q
+from src.constants.models import GEOMETRIC_LABEL
+from src.constants.base import ACTUAL, EFECTO
 import time
-from src.funcs.base import ABECEDARY
+from itertools import product
 from functools import lru_cache
-from concurrent.futures import ThreadPoolExecutor
-import multiprocessing as mp
-import itertools
-import src.controllers.strategies.TablaSecuencialCostos as  TablaSecuencialCostos
 
-class Geometric(SIA):
+
+class GeometricSIA(SIA):
     def __init__(self, gestor):
         super().__init__(gestor)
-        self.tabla_costos = None
-
-    def aplicar_estrategia(self, condicion: str, alcance: str, mecanismo: str):
+        self.tensors = None
+        self.transiciones = {}
+        self.memoria = dict()
+        self.X_v_global = dict()  # Almacena X_v globalmente para evitar recalcularlo
+        self.TablaCostos = {}
+    def aplicar_estrategia(self, condicion: str, alcance_mask: str, mecanismo_mask: str):
         """
-        Aplica la estrategia geométrica para encontrar la mejor bipartición del sistema,
-        usando la estructura del hipercubo y la distancia de Hamming.
+        Implementación de la estrategia geométrica.
         """
         
-        self.sia_cargar_tpm()
+        self.sia_preparar_subsistema(condicion, alcance_mask, mecanismo_mask)
+        subsistema: System = self.sia_subsistema
         
         
-        # Paso 1: preparar el subsistema usando el método de SIA
-        self.sia_preparar_subsistema(condicion, alcance, mecanismo)
+        print(f"ya hice el Subsistema preparado")
+        print(f"ya hice la tabla de transiciones")
+        candidatos = self.identificar_biparticiones_candidatas(3)
+        print(f"Candidatos identificados: {candidatos}")
+        alcance, mecanismo, mejor_phi, mejor_distribucion = self.evaluar_biparticiones(candidatos, subsistema)
+        
+        tpm = self.sia_cargar_tpm()
 
-        # Paso 2: obtener la dimensión del sistema (número de variables)
-        n = len(self.sia_gestor.estado_inicial)
+        origen =  mecanismo_mask
+        destino = alcance_mask
+        print(f"Origen: {origen}, Destino: {destino}")
+        
+        self.X_v = self.construir_X_v_desde_tpm(tpm)  # o con estados relevantes si quieres
 
-        # Paso 3: crear la tabla de costos (si aplica en tu lógica)
-        self.tabla_costos = TablaSecuencialCostos(n=n, max_distance=7)
 
-        # Paso 4: generar biparticiones posibles (solo hasta la mitad por simetría)
-        indices = list(range(n))
-        mejor_particion = None
-        mejor_costo = float('inf')
 
-        for k in range(1, n // 2 + 1):
-            for grupoA in itertools.combinations(indices, k):
-                grupoB = tuple(i for i in indices if i not in grupoA)
-                costo = self.evaluar_particion(grupoA, grupoB)
-                if costo < mejor_costo:
-                    mejor_costo = costo
-                    mejor_particion = (grupoA, grupoB)
+        # Construir X_v desde la TPM
 
-        # Paso 5: retornar la solución
-        return Solution(
-            label=GEOMETRIC_LABEL,
-            particion=mejor_particion,
-            tiempo_ejecucion=time.time() - self.sia_tiempo_inicio
+        print(f"X_v construido: {self.X_v_global}")
+        pares = self.generar_pares_hamming_1(len(origen))  # -1 porque el último bit es el de paridad
+       
+        for a, b in pares:
+            self.TablaCostos[(a, b)] = self.calcular_costo_simple(a, b, self.X_v)
+
+
+        print(self.TablaCostos)
+        
+        
+        # Formatear partición como en QNodes
+        fmt_mip = fmt_biparte_q(
+            list((EFECTO, i) for i in alcance),
+            list((ACTUAL, i) for i in mecanismo)
         )
 
-    def evaluar_particion(self, grupoA, grupoB):
-        """
-        Cuenta cuántas transiciones elementales (cambio de un bit) cruzan la bipartición.
-        Los estados se representan como cadenas binarias de tamaño n.
-        """
-        n = len(self.sia_gestor.estado_inicial)
-        grupoA = set(grupoA)
-        grupoB = set(grupoB)
-        costo = 0
-
-        # Genera todos los estados posibles como cadenas binarias de tamaño n
-        for estado_int in range(2 ** n):
-            estado_bin = format(estado_int, f'0{n}b')  # Ej: '0101'
+        return Solution(
+            estrategia=GEOMETRIC_LABEL,
+            perdida=mejor_phi,
+            distribucion_subsistema=subsistema.distribucion_marginal(),
+            distribucion_particion=mejor_distribucion,
+            tiempo_total=time.time() - self.sia_tiempo_inicio,
+            particion=fmt_mip
+        )
+    
+    def identificar_biparticiones_candidatas(self,n) -> list[Tuple[np.ndarray, np.ndarray]]:
+            
+            candidatos = []
             for i in range(n):
-                # Cambia el bit i
-                nuevo_estado_bin = list(estado_bin)
-                nuevo_estado_bin[i] = '1' if estado_bin[i] == '0' else '0'
-                nuevo_estado_bin = ''.join(nuevo_estado_bin)
-                nuevo_estado_int = int(nuevo_estado_bin, 2)
-                if nuevo_estado_int > estado_int:  # Evita contar dos veces cada transición
-                    # Si el bit cambiado pertenece a grupoA y el resto a grupoB, o viceversa
-                    if (i in grupoA and any(j in grupoB for j in range(n) if estado_bin[j] != nuevo_estado_bin[j])) or \
-                       (i in grupoB and any(j in grupoA for j in range(n) if estado_bin[j] != nuevo_estado_bin[j])):
-                        costo += 1
-        return costo
+                alcance = np.array([i], dtype=np.int8)
+                mecanismo = np.setdiff1d(np.arange(n), alcance)
+                candidatos.append((alcance, mecanismo))
+            return candidatos
     
-    
+    def evaluar_biparticiones(self, candidatos, sistema: System):
+        mejor = None
+        mejor_phi = float("inf")
+        mejor_distribucion = None
 
+        for alcance, mecanismo in candidatos:
+            if mecanismo.size == 0:
+                continue
+            bipartido = sistema.bipartir(alcance, mecanismo)
+            distribucion = bipartido.distribucion_marginal()
+            phi = np.sum(distribucion)
+            if phi < mejor_phi:
+                mejor_phi = phi
+                mejor = (alcance, mecanismo)
+                mejor_distribucion = distribucion
+        alcance, mecanismo = mejor
+        return alcance, mecanismo, mejor_phi, mejor_distribucion
         
+    def construir_X_v_desde_tpm(self, tpm: np.ndarray, estados_relevantes=None) -> dict:
+        """
+        Construye un diccionario X_v solo para los estados relevantes.
+        Si estados_relevantes es None, construye para todos los estados.
+        """
+        n = int(np.log2(tpm.shape[0]))
+        X_v = {}
+        if estados_relevantes is None:
+            for j in range(tpm.shape[0]):
+                estado_bin = format(j, f'0{n}b')
+                X_v[estado_bin] = tpm[j]
+        else:
+            for estado_bin in estados_relevantes:
+                j = int(estado_bin, 2)
+                X_v[estado_bin] = tpm[j]
+        return X_v
+
+
+    def hamming(self, a, b):
+        return sum(x != y for x, y in zip(a, b))
+
+    def vecinos_hamming_1(self, estado):
+        """Genera todos los vecinos a distancia Hamming 1"""
+        vecinos = []
+        for i in range(len(estado)):
+            nuevo = estado[:i] + ('0' if estado[i] == '1' else '1') + estado[i+1:]
+            vecinos.append(nuevo)
+        return vecinos
+
+    def generar_pares_hamming_1(self, n):
+        """
+        Genera pares (a, b) de estados binarios de n bits que solo difieren en un bit.
+        """
+        estados = [''.join(bits) for bits in product('01', repeat=n)]
+        pares = set()
+
+        for estado in estados:
+            for vecino in self.vecinos_hamming_1(estado):
+                # Evitar duplicados como ('000', '001') y ('001', '000')
+                if (vecino, estado) not in pares:
+                    pares.add((estado, vecino))
+
+        return sorted(pares)
+
+    @lru_cache(maxsize=None)
+    def calcular_costo_ruta_especifica(self, origen, destino, X_v_tuple):
+        """
+        Calcula el costo de una ruta específica usando memoización.
+        X_v_tuple debe ser una tupla de (estado, valor) para permitir hashing.
+        """
+        # Convertir tupla de vuelta a diccionario para cálculos
+        X_v = dict(X_v_tuple)
+        #print(f"Calculando costo entre {origen} y {destino} con X_v: {X_v}")
+        d = self.hamming(origen, destino)
+        costo_directo_total = []
+        # Caso base
+        if d == 0:
+            return 0.0
         
+        for i in range(len(origen)):            
+            # Cálculo del costo
+            gamma = 2 ** (-d)
+            costo_directo = (abs(X_v[origen][i] - X_v[destino][i]))
+            #print(f"Calculando costo directo entre {origen} y {destino}: {costo_directo} (gamma: {gamma})")
+            # Calcular acumulado de vecinos intermedios
+            acumulado = 0.0
+            for vecino in self.vecinos_hamming_1(origen):
+                if self.hamming(vecino, destino) < d:  # vecino está en camino óptimo
+                    acumulado += self.calcular_costo_ruta_especifica(vecino, destino, X_v_tuple)
+            costo_directo_total.append(gamma * (costo_directo + acumulado))
+        return costo_directo_total
+        
+
+
+    def calcular_costo_simple(self, origen, destino, X_v):
+        """
+        Interfaz simple para calcular el costo entre dos estados específicos
+        """
+        # Convierte los valores de X_v a tuplas si son arrays
+        X_v_hashable = {k: tuple(v) if isinstance(v, np.ndarray) else v for k, v in X_v.items()}
+        # Convertir X_v a tupla para permitir memoización
+        X_v_tuple = tuple(sorted(X_v_hashable.items()))
+
+        return self.calcular_costo_ruta_especifica(origen, destino, X_v_tuple)
