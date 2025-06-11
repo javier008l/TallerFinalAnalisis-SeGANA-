@@ -29,10 +29,10 @@ class GeometricSIA(SIA):
         subsistema: System = self.sia_subsistema
         
         
-        print(f"ya hice el Subsistema preparado")
-        print(f"ya hice la tabla de transiciones")
+        print("ya hice el Subsistema preparado")
+        print("ya hice la tabla de transiciones")
         candidatos = self.identificar_biparticiones_candidatas(3)
-        print(f"Candidatos identificados: {candidatos}")
+        #print(f"Candidatos identificados: {candidatos}")
         alcance, mecanismo, mejor_phi, mejor_distribucion = self.evaluar_biparticiones(candidatos, subsistema)
         
         tpm = self.sia_cargar_tpm()

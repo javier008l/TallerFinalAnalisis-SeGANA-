@@ -26,8 +26,12 @@ class GeometricSIA(SIA):
         """
         self.sia_preparar_subsistema(condicion, alcance, mecanismo)
 
-        tabla = self.construir_tabla_costos_variable(mecanismo, alcance, 0)  # Ejemplo para variable 0
-        print(f"Tabla de costos para la variable 0:\n{tabla}")
+        tabla = self.construir_tabla_costos_variable(mecanismo)  # Ejemplo para variable 0
+
+
+        caminos = self.caminos_hamming_1(mecanismo, alcance)
+        print(f"Caminos Hamming 1 desde {mecanismo} a {alcance}: {caminos}")
+
         # print(f"Subsistema preparado: {subsistema}")
         # #print(f"tpm shape: {self.tpm.shape}")
         # costo = self.costo(0, 1, 0)  # Llamada de prueba para inicializar el cache
@@ -73,26 +77,34 @@ class GeometricSIA(SIA):
     
     
     def hamming(self, a, b):
-        a_bin = format(a, f'0{self.n_vars}b') if isinstance(a, int) else a
-        b_bin = format(b, f'0{self.n_vars}b') if isinstance(b, int) else b
-        
+        if isinstance(a, int):
+            a_bin = format(a, f'0{self.n_vars}b')
+        else:
+            # Si es string, asegurar la longitud correcta
+            a_bin = a.zfill(self.n_vars)
+            
+        if isinstance(b, int):
+            b_bin = format(b, f'0{self.n_vars}b')
+        else:
+            # Si es string, asegurar la longitud correcta
+            b_bin = b.zfill(self.n_vars)
         # Asegurar que ambas cadenas tengan la misma longitud
         if len(a_bin) != len(b_bin):
             raise ValueError(f"Las cadenas deben tener la misma longitud: {a_bin} vs {b_bin}")
             
         return sum(x != y for x, y in zip(a_bin, b_bin))
 
-    # def vecinos_hamming_1(self, estado):
-    #     """Genera todos los vecinos a distancia Hamming 1"""
-    #     vecinos = []
-    #     for i in range(len(estado)):
-    #         nuevo = estado[:i] + ('0' if estado[i] == '1' else '1') + estado[i+1:]
-    #         vecinos.append(nuevo)
-    #     return vecinos
+    def vecinos_hamming_1(self, estado):
+        """Genera todos los vecinos a distancia Hamming 1"""
+        vecinos = []
+        for i in range(len(estado)):
+            nuevo = estado[:i] + ('0' if estado[i] == '1' else '1') + estado[i+1:]
+            vecinos.append(nuevo)
+        return vecinos
     
     
 
-    def vecinos_hamming_1(self, origen: str, destino: str) -> list[list[str]]:
+    def caminos_hamming_1(self, origen: str, destino: str) -> list[list[str]]:
         """
         Genera todos los caminos binarios de Hamming 1 desde `origen` hasta `destino`.
         """
@@ -125,9 +137,11 @@ class GeometricSIA(SIA):
         origen_idx = int(origen, 2) if isinstance(origen, str) else origen
         destino_idx = int(destino, 2) if isinstance(destino, str) else destino
         d = self.hamming(origen, destino)
+       # print(f"Calculando costo de ruta de {origen} a {destino} con distancia Hamming {d}")
 
         clave = (origen, destino, x_v_hashable)
         if clave in self.cache:
+            #print(f"Cache hit for {self.cache[clave]}")
             return self.cache[clave]
 
         # Caso base
@@ -142,51 +156,30 @@ class GeometricSIA(SIA):
 
         # Calcular acumulado de vecinos intermedios
         acumulado = 0.0
-        for vecinos in self.vecinos_hamming_1(origen, destino):
-            vecino = vecinos[-1]  # El último vecino es el destino
-            if self.hamming(vecino, destino) < d:  # vecino está en camino óptimo
+        for vecinos in self.vecinos_hamming_1(origen):
+            vecino = vecinos  # El último vecino es el destino
+            if self.hamming(vecino, destino) <= d:  # vecino está en camino óptimo
                 acumulado += self.calcular_costo_ruta_especifica(vecino, destino, x_v_tuple)
 
         return gamma * (costo_directo + acumulado)
     
-    def construir_tabla_costos_variable(self, mecanismo, alcance, var_idx) -> pd.DataFrame:
+    def construir_tabla_costos_variable(self, origen) -> pd.DataFrame:
         """Construye la tabla de costos para una variable específica en formato de DataFrame."""
         print(f"n_states: {self.n_states}, n_vars: {self.n_vars}")
     
         data = []
-        x_v_tuple = self.tpm[:, var_idx]
+        
+        for k in range(len(origen)):
+            for _ in range(1):
+                for j in range(self.n_states):
+                    j_bin = format(j, f'0{self.n_vars}b')
+                    hamming_distance = self.hamming(origen, j_bin)
 
-        # Convertir a binarios si es necesario
-        origen_bin = mecanismo
-        destino_bin = alcance
-
-        # Obtener todos los caminos desde origen a destino
-        caminos = self.vecinos_hamming_1(origen_bin, destino_bin)
-
-        destinos_agregados = set()
-
-        for camino in caminos:
-            costo_total = 0.0
-            for i in range(1, len(camino)):
-                origen_step = camino[i-1]
-                destino_step = camino[i]
-
-                paso = (origen_step, destino_step)
-                if paso in self.cache:
-                    costo = self.cache[paso]
-
-                else:
-                    costo = self.calcular_costo_ruta_especifica(origen_step, destino_step, x_v_tuple)
-                    self.cache[paso] = costo
-            
-                costo_total += costo
-                destino_acumulado = camino[i]
-                if destino_acumulado not in destinos_agregados:
-                    data.append([f"t({camino[0]},{destino_acumulado})", costo_total])
-                    destinos_agregados.add(destino_acumulado)
-
-        df = pd.DataFrame(data, columns=["Transición", f"Variable {var_idx}"])
-        print(df)
+                    if hamming_distance >= 1:
+                        costo = self.calcular_costo_ruta_especifica(origen, j_bin, x_v_tuple=self.tpm[:, k])
+                        transicion = f"t({origen},{j_bin})"
+                        data.append([transicion, costo])
+                df = pd.DataFrame(data, columns=["Transición", "Variable "])
         
         return df
     

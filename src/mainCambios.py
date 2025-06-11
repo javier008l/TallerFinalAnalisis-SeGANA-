@@ -4,7 +4,8 @@ import os
 from src.controllers.manager import Manager
 from src.controllers.strategies.geometric import GeometricSIA
 from src.controllers.strategies.phi import Phi
-from src.controllers.strategies.geometric import GeometricSIA
+from src.controllers.strategies.q_nodes import QNodes
+from src.controllers.strategies.geometric2 import GeometricSIA
 from src.controllers.strategies.fastsplit import FastSplit
 from collections.abc import Iterable
 
@@ -15,30 +16,30 @@ def iniciar():
     # estado_inicio = "100"
     # condiciones = "111"
     # casos = [
-    #     # ('111', '100'),  # ABCt+1 | ABCt
-    #     #  ('111', '111'),  # ABCt+1 | ABCt
-    #     #  ('111', '110'),  # ABCt+1 | ABt
-    #       ('111', '101'),  # ABCt+1 | ACt
-    #      ('111', '011')#,  # ABCt+1 | BCt
-    #     # ('110', '111'),  # ABt+1 | ABCt
-    #     # ('110', '110'),  # ABt+1 | ABt
-    #     # ('110', '101'),  # ABt+1 | ACt
-    #     # ('110', '011'),  # ABt+1 | BCt
-    #     # ('101', '111'),  # ACt+1 | ABCt
-    #     # ('101', '110'),  # ACt+1 | ABt
-    #     # ('101', '101'),  # ACt+1 | ACt
-    #     # ('101', '011'),  # ACt+1 | BCt
-    #     # ('011', '111'),  # BCt+1 | ABCt
-    #     # ('011', '110'),  # BCt+1 | ABt
-    #     # ('011', '101'),  # BCt+1 | ACt
-    #     # ('011', '011')   # BCt+1 | BCt
+    #     ('111', '101'),  # ABCt+1 | ABCt
+    #     ('111', '111'),  # ABCt+1 | ABCt
+    #     ('111', '110'),  # ABCt+1 | ABt
+    #     ('111', '101'),  # ABCt+1 | ACt
+    #     ('111', '011'),  # ABCt+1 | BCt
+        # ('110', '111'),  # ABt+1 | ABCt
+        # ('110', '110'),  # ABt+1 | ABt
+        # ('110', '101'),  # ABt+1 | ACt
+        # ('110', '011'),  # ABt+1 | BCt
+        # ('101', '111'),  # ACt+1 | ABCt
+        # ('101', '110'),  # ACt+1 | ABt
+        # ('101', '101'),  # ACt+1 | ACt
+        # ('101', '011'),  # ACt+1 | BCt
+        # ('011', '111'),  # BCt+1 | ABCt
+        # ('011', '110'),  # BCt+1 | ABt
+        # ('011', '101'),  # BCt+1 | ACt
+        # ('011', '011')   # BCt+1 | BCt
     # ]
 
-    estado_inicio = "100000"
-    condiciones =    "111111"
-    # Lista de pruebas a realizar
-    casos = [
-    ('011111', '111111'),  # BCDEFt+1 | ABCDEFt
+    # estado_inicio = "100000"
+    # condiciones =    "111111"
+    # # Lista de pruebas a realizar
+    # casos = [
+    # ('011111', '111111'),  # BCDEFt+1 | ABCDEFt
     # ('101101', '111111'),  # ACDFt+1 | ABCDEFt
     # ('101110', '111111'),  # ACDEt+1 | ABCDEFt
     # ('101111', '011111'),  # ACDEFt+1 | BCDEFt
@@ -92,9 +93,9 @@ def iniciar():
     # ('111111', '111011'),  # ABCDEFt+1 | ABCEFt
     # ('111111', '111110'),  # ABCDEFt+1 | ABCDEt
 
-#     ('111111', '011111'),  # ABCDEFt+1 | BCDEFt
-#     ('111111', '111111'),  # ABCDEFt+1 | ABCDEFt
- ]
+    # ('111111', '011111'),  # ABCDEFt+1 | BCDEFt
+    # ('111111', '111111'),  # ABCDEFt+1 | ABCDEFt
+    # ]
     
     # estado_inicio = "1000000000"  # Nunca cambia
     # condiciones = "1111111111"    # Nunca cambia
@@ -163,15 +164,15 @@ def iniciar():
     # condiciones   = "111111111111111"    # Nunca cambia
     
     # casos = [
-    #     # ("111111111111111", "111111111111111"),
-    #     # ("111111111111111", "111111111111110"),
-    #     # ("111111111111111", "011111111111111"),
+        # ("111111111111111", "111111111111111"),
+        # ("111111111111111", "111111111111110"),
+        # ("111111111111111", "011111111111111"),
     
-    #     # ("111111111111111", "011111111111110"),
-    #     # ("111111111111111", "101010101010101"),
-    #     ("111111111111111", "010101010101010"),
-    #     ("111111111111111", "110110110110110"),
-    # ]
+        # ("111111111111111", "011111111111110"),
+        # ("111111111111111", "101010101010101"),
+        # ("111111111111111", "010101010101010"),
+        # ("111111111111111", "110110110110110"),
+    
         # ("111111111111110", "111111111111111"),
         # ("111111111111110", "111111111111110"),
         # ("111111111111110", "011111111111111"),
@@ -223,11 +224,11 @@ def iniciar():
     #     ("011111100111111", "011111111111111"),
     # ]
     
-    # estado_inicio = "10000000000000000000"  # Nunca cambia
-    # condiciones   = "11111111111111111111"    # Nunca cambia
+    estado_inicio = "10000000000000000000"  # Nunca cambia
+    condiciones   = "11111111111111111111"    # Nunca cambia
     
-    # casos = [
-    # ("11111111111111111111", "11111111111111111111"),
+    casos = [
+    ("11111111111111111111", "11111111111111111111"),
     # ("11111111111111111111", "11111111111111111110"),
     # ("11111111111111111111", "01111111111111111111"),
     # ("11111111111111111111", "01111111111111111110"),
@@ -286,16 +287,16 @@ def iniciar():
 #     ("11011011011011011011", "01010101010101010101"),
 #     ("11011011011011011011", "11011011011011011011"),
 #     ("10111111111111111111", "10111111111111111111")        
-# ]
+]
     
     # Lista para almacenar los resultados
     #resultados = []
     
     # Creacion de la red TPM
-    #Manager.generar_red( self=Manager, dimensiones=3, datos_discretos=True)
+    #Manager.generar_red( self=Manager, dimensiones=17, datos_discretos=True)
     
     # Nombre del archivo de resultados
-    archivo_excel = "PruebasTaller2.xlsx"
+    archivo_excel = "PruebasTallerFast.xlsx"
 
     # Si el archivo no existe, crearlo con las columnas
     if not os.path.exists(archivo_excel):
@@ -308,7 +309,7 @@ def iniciar():
         config_sistema = Manager(estado_inicial=estado_inicio)
         
         ## Ejemplo de solución mediante módulo de fuerza bruta (QNodes) ###
-        analizador_fb = GeometricSIA(config_sistema)
+        analizador_fb = FastSplit(config_sistema)
         resultado = analizador_fb.aplicar_estrategia(condiciones, alcance, mecanismo)
         
         # Extraer los datos de la solución
@@ -320,7 +321,7 @@ def iniciar():
             "Tiempo Total": resultado.tiempo_ejecucion,
             "Particion": resultado.particion
         }
-        hoja_destino = "3 nodos"
+        hoja_destino = "20 nodos"
         
         try:
             # Intenta leer el archivo Excel existente
