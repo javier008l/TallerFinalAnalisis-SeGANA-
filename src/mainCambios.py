@@ -14,7 +14,7 @@ def iniciar():
     estado_inicio = "100"
     condiciones = "111"
     casos = [
-        ('111', '100'),  # ABCt+1 | ABCt
+        ('111', '000'),  # ABCt+1 | ABCt
         # ('111', '111'),  # ABCt+1 | ABCt
         # ('111', '110'),  # ABCt+1 | ABt
         # ('111', '101'),  # ABCt+1 | ACt
