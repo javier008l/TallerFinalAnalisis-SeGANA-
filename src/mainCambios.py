@@ -2,42 +2,43 @@ import pandas as pd
 from openpyxl import load_workbook
 import os
 from src.controllers.manager import Manager
-from src.controllers.strategies.geometric2 import GeometricSIA
+from src.controllers.strategies.geometric import GeometricSIA
 from src.controllers.strategies.phi import Phi
-from src.controllers.strategies.geometric2 import GeometricSIA
+from src.controllers.strategies.geometric import GeometricSIA
 from src.controllers.strategies.fastsplit import FastSplit
 from collections.abc import Iterable
 
 
 def iniciar():
     """Punto de entrada principal"""
-    estado_inicio = "100"
-    condiciones = "111"
-    casos = [
-        ('111', '000'),  # ABCt+1 | ABCt
-        # ('111', '111'),  # ABCt+1 | ABCt
-        # ('111', '110'),  # ABCt+1 | ABt
-        # ('111', '101'),  # ABCt+1 | ACt
-        # ('111', '011'),  # ABCt+1 | BCt
-        # ('110', '111'),  # ABt+1 | ABCt
-        # ('110', '110'),  # ABt+1 | ABt
-        # ('110', '101'),  # ABt+1 | ACt
-        # ('110', '011'),  # ABt+1 | BCt
-        # ('101', '111'),  # ACt+1 | ABCt
-        # ('101', '110'),  # ACt+1 | ABt
-        # ('101', '101'),  # ACt+1 | ACt
-        # ('101', '011'),  # ACt+1 | BCt
-        # ('011', '111'),  # BCt+1 | ABCt
-        # ('011', '110'),  # BCt+1 | ABt
-        # ('011', '101'),  # BCt+1 | ACt
-        # ('011', '011')   # BCt+1 | BCt
-    ]
-
-    # estado_inicio = "100000"
-    # condiciones =    "111111"
-    # # Lista de pruebas a realizar
+    
+    # estado_inicio = "100"
+    # condiciones = "111"
     # casos = [
-    # ('011111', '111111'),  # BCDEFt+1 | ABCDEFt
+    #     # ('111', '100'),  # ABCt+1 | ABCt
+    #     #  ('111', '111'),  # ABCt+1 | ABCt
+    #     #  ('111', '110'),  # ABCt+1 | ABt
+    #       ('111', '101'),  # ABCt+1 | ACt
+    #      ('111', '011')#,  # ABCt+1 | BCt
+    #     # ('110', '111'),  # ABt+1 | ABCt
+    #     # ('110', '110'),  # ABt+1 | ABt
+    #     # ('110', '101'),  # ABt+1 | ACt
+    #     # ('110', '011'),  # ABt+1 | BCt
+    #     # ('101', '111'),  # ACt+1 | ABCt
+    #     # ('101', '110'),  # ACt+1 | ABt
+    #     # ('101', '101'),  # ACt+1 | ACt
+    #     # ('101', '011'),  # ACt+1 | BCt
+    #     # ('011', '111'),  # BCt+1 | ABCt
+    #     # ('011', '110'),  # BCt+1 | ABt
+    #     # ('011', '101'),  # BCt+1 | ACt
+    #     # ('011', '011')   # BCt+1 | BCt
+    # ]
+
+    estado_inicio = "100000"
+    condiciones =    "111111"
+    # Lista de pruebas a realizar
+    casos = [
+    ('011111', '111111'),  # BCDEFt+1 | ABCDEFt
     # ('101101', '111111'),  # ACDFt+1 | ABCDEFt
     # ('101110', '111111'),  # ACDEt+1 | ABCDEFt
     # ('101111', '011111'),  # ACDEFt+1 | BCDEFt
@@ -93,7 +94,7 @@ def iniciar():
 
 #     ('111111', '011111'),  # ABCDEFt+1 | BCDEFt
 #     ('111111', '111111'),  # ABCDEFt+1 | ABCDEFt
-# ]
+ ]
     
     # estado_inicio = "1000000000"  # Nunca cambia
     # condiciones = "1111111111"    # Nunca cambia
